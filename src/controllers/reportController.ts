@@ -1,16 +1,31 @@
-import { Request, Response } from 'express';
-import globalRepo from '../repositories/globalRepository';
-import { toReportView, computeTotalAmount } from '../services/reportService';
-import { JwtPayload } from '../middleware/auth';
-import { getReportsByUser, Report, createReport as modelCreateReport } from '../models/report';
-import JobQueueService from '../services/jobQueueService'; 
 import jwt from 'jsonwebtoken';
-import { randomUUID } from 'crypto';
-import upload from '../services/fileStorageService';
 import multer from 'multer';
 import fs from "fs";
+import { randomUUID } from 'crypto';
+import { Request, Response } from 'express';
+import globalRepo from '../repositories/globalRepository';
+import { JwtPayload } from '../middleware/auth';
+import { toReportView, computeTotalAmount } from '../services/reportService';
+import { getReportsByUser, Report, createReport as modelCreateReport } from '../models/report';
+import JobQueueService from '../services/jobQueueService'; 
+import upload from '../services/fileStorageService';
 
 const repo = globalRepo.reports;
+
+export async function listReports(req: Request, res: Response) {
+    try {
+        const user = (req as any).user as JwtPayload | undefined;
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+        let reports: Report[] = await getReportsByUser(user.id, user.role);
+
+        return res.json(reports.map((r) => toReportView(r)));
+    } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(err);
+        return res.status(500).json({ error: 'InternalError' });
+    }
+}
 
 export async function createReport(req: Request, res: Response) {
     try {
@@ -137,21 +152,6 @@ export async function getReport(req: Request, res: Response) {
             delete shaped.comments;
         }
         return res.json(shaped);
-    } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error(err);
-        return res.status(500).json({ error: 'InternalError' });
-    }
-}
-
-export async function listReports(_req: Request, res: Response) {
-    try {
-        const user = (_req as any).user as JwtPayload | undefined;
-        if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-        let reports: Report[] = await getReportsByUser(user.id, user.role);
-
-        return res.json(reports.map((r) => toReportView(r)));
     } catch (err) {
         // eslint-disable-next-line no-console
         console.error(err);

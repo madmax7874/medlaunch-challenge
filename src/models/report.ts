@@ -1,7 +1,5 @@
 import { randomUUID } from "crypto";
 import globalRepo from "../repositories/globalRepository";
-import e from "express";
-
 export type ReportStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
 export interface ReportEntry {

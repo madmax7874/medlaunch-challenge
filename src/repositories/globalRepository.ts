@@ -9,12 +9,6 @@ const seededUserIds = {
     user1: randomUUID(),
     user2: randomUUID(),
 };
-// generate seeded ids for reports as UUIDs
-const seededReportIds = {
-    r1: randomUUID(),
-    r2: randomUUID(),
-    r3: randomUUID(),
-};
 
 class InMemoryUserRepository {
     private store: User[] = [];
