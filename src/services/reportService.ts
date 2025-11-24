@@ -7,18 +7,17 @@ export function computeTotalAmount(report: Report): number {
 export interface ViewOptions {
   include?: string[]; // e.g., ['entries','comments','metadata']
   compact?: boolean; // compact flattened view
-  entriesPage?: number;
-  entriesSize?: number;
+  offset?: number;
+  limit?: number;
   entriesSort?: 'amount_desc' | 'amount_asc' | 'date_desc' | 'date_asc';
   entriesMinAmount?: number;
 }
 
-function paginate<T>(arr: T[], page = 1, size = 10): { items: T[]; page: number; size: number; total: number } {
+function paginateOffset<T>(arr: T[], offset = 0, limit = 10): { items: T[]; offset: number; limit: number; total: number } {
   const total = arr.length;
-  const p = Math.max(1, page);
-  const s = Math.max(1, size);
-  const start = (p - 1) * s;
-  return { items: arr.slice(start, start + s), page: p, size: s, total };
+  const off = Math.max(0, Math.floor(offset));
+  const lim = Math.max(1, Math.floor(limit));
+  return { items: arr.slice(off, off + lim), offset: off, limit: lim, total };
 }
 
 export function toReportView(report: Report, opts?: ViewOptions): any {
@@ -67,9 +66,9 @@ export function toReportView(report: Report, opts?: ViewOptions): any {
 
   let entriesPageResult: any = null;
   if (include.has('entries')) {
-    const page = options.entriesPage ?? 1;
-    const size = options.entriesSize ?? 25;
-    entriesPageResult = paginate(entries, page, size);
+    const offset = options.offset ?? 0;
+    const limit = options.limit ?? 25;
+    entriesPageResult = paginateOffset(entries, offset, limit);
   }
 
   if (options.compact) {
@@ -109,7 +108,7 @@ export function toReportView(report: Report, opts?: ViewOptions): any {
   if (include.has('metrics')) view.metrics = metrics;
 
   // attach pagination metadata for entries if present
-  if (entriesPageResult) view.entriesPagination = { page: entriesPageResult.page, size: entriesPageResult.size, total: entriesPageResult.total };
+  if (entriesPageResult) view.entriesPagination = { offset: entriesPageResult.offset, limit: entriesPageResult.limit, total: entriesPageResult.total };
 
   return view as ReportView;
 }

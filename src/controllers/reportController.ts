@@ -86,25 +86,31 @@ export async function getReport(req: Request, res: Response) {
         // Authorization: admin sees all, user sees own or if listed
             const canAccess = ((): boolean => {
                 if (user.role === 'ADMIN') return true;
-                    if (user.role === 'USER') return rec.ownerId === user.id || (Array.isArray(rec.viewers) && rec.viewers.some((v) => v.userId === user.id));
+                if (user.role === 'USER') return rec.ownerId === user.id || (Array.isArray(rec.viewers) && rec.viewers.some((v) => v.userId === user.id));
                 return false;
             })();
         if (!canAccess) return res.status(403).json({ error: 'Forbidden' });
 
         // Parse view options from query params
-        const { include, view, entriesPage, entriesSize, entriesSort, entriesMinAmount } = req.query || {};
+        const { include, compact, offset, limit, entriesSort, entriesMinAmount } = req.query || {};
         const includeList = typeof include === 'string' ? include.split(',').map((s) => s.trim()) : undefined;
-        const compact = view === 'compact' || view === 'summary';
+        // compact param: treat 'yes' as true, anything else as false
+        const compactBool = typeof compact === 'string' && compact.toLowerCase() === 'yes';
         const opts: any = {
             include: includeList,
-            compact,
+            compact: compactBool,
         };
-        if (entriesPage) opts.entriesPage = Number(entriesPage);
-        if (entriesSize) opts.entriesSize = Number(entriesSize);
+        if (offset) opts.offset = Number(offset);
+        if (limit) opts.limit = Number(limit);
         if (entriesSort && typeof entriesSort === 'string') opts.entriesSort = entriesSort as any;
         if (entriesMinAmount) opts.entriesMinAmount = Number(entriesMinAmount);
 
-        const shaped = toReportView(rec, opts);
+        let shaped = toReportView(rec, opts);
+        if (compactBool) {
+            // Remove viewers/comments from summary
+            delete shaped.viewers;
+            delete shaped.comments;
+        }
         return res.json(shaped);
     } catch (err) {
         // eslint-disable-next-line no-console
