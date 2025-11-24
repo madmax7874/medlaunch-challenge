@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import globalRepo from "../repositories/globalRepository";
+import e from "express";
 
 export type ReportStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
@@ -20,6 +21,16 @@ export interface ReportComment {
   priority?: 'low' | 'normal' | 'high';
 }
 
+export interface ReportAttachment {
+  id: string;
+  filename: string;
+  mimetype: string;
+  size: number;
+  storagePath: string;
+  uploadedAt: string
+  owner: string;
+}
+
 export type Metadata = Record<string, string | number | boolean>;
 
 export interface Report {
@@ -37,6 +48,7 @@ export interface Report {
   status: ReportStatus;
   comments?: ReportComment[];
   metadata?: Metadata;
+  attachments?: ReportAttachment[];
 }
 
 export interface ReportView extends Report {

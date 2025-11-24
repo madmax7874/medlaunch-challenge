@@ -13,11 +13,11 @@ export interface ViewOptions {
   entriesMinAmount?: number;
 }
 
-function paginateOffset<T>(arr: T[], offset = 0, limit = 10): { items: T[]; offset: number; limit: number; total: number } {
+function paginate<T>(arr: T[], offset = 0, limit = 5): { items: T[]; offset: number; limit: number; total: number } {
   const total = arr.length;
   const off = Math.max(0, Math.floor(offset));
   const lim = Math.max(1, Math.floor(limit));
-  return { items: arr.slice(off, off + lim), offset: off, limit: lim, total };
+  return { items: arr.slice(off*lim, off*lim + lim), offset: off, limit: lim, total };
 }
 
 export function toReportView(report: Report, opts?: ViewOptions): any {
@@ -66,9 +66,7 @@ export function toReportView(report: Report, opts?: ViewOptions): any {
 
   let entriesPageResult: any = null;
   if (include.has('entries')) {
-    const offset = options.offset ?? 0;
-    const limit = options.limit ?? 25;
-    entriesPageResult = paginateOffset(entries, offset, limit);
+    entriesPageResult = paginate(entries, options.offset, options.limit);
   }
 
   if (options.compact) {

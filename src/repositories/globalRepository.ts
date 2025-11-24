@@ -146,10 +146,8 @@ export class InMemoryReportRepository {
         const merged: Report = {
             ...existing,
             ...updated,
-            id: existing.id,
             version: (existing.version ?? 0) + 1,
             updatedAt: now,
-            createdAt: existing.createdAt,
         } as Report;
         this.store.set(id, merged);
         return merged;
@@ -163,6 +161,8 @@ export class InMemoryReportRepository {
 export const globalRepo = {
     reports: new InMemoryReportRepository(),
     users: new InMemoryUserRepository(),
+    // simple in-memory idempotency store for requests keyed by Idempotency-Key
+    idempotency: new Map<string, { reportId: string; result: any; status: number; timestamp: string }>(),
 } as const;
 
 export type GlobalRepository = typeof globalRepo;
