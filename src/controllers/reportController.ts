@@ -3,22 +3,19 @@ import multer from 'multer';
 import fs from "fs";
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
-import globalRepo from '../repositories/globalRepository';
 import { JwtPayload } from '../middleware/auth';
 import { toReportView, computeTotalAmount } from '../services/reportService';
-import { getReportsByUser, Report, createReport as modelCreateReport } from '../models/report';
-import JobQueueService from '../services/jobQueueService'; 
+import { Report, getReportsByUser, getReportById, createReport as modelCreateReport, updateReport as modelUpdateReport } from '../models/report';
+import JobQueueService from '../services/jobQueueService';
 import upload from '../services/fileStorageService';
 
-const repo = globalRepo.reports;
 
 export async function listReports(req: Request, res: Response) {
     try {
         const user = (req as any).user as JwtPayload | undefined;
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-        let reports: Report[] = await getReportsByUser(user.id, user.role);
-
+        let reports: Report[] = getReportsByUser(user.id);
         return res.json(reports.map((r) => toReportView(r)));
     } catch (err) {
         // eslint-disable-next-line no-console
@@ -119,15 +116,16 @@ export async function createReport(req: Request, res: Response) {
 export async function getReport(req: Request, res: Response) {
     try {
         const id = req.params.id;
-        const rec = await repo.findById(id);
-        if (!rec) return res.status(404).json({ error: 'NotFound' });
+        const report = getReportById(id);
+        if (!report) return res.status(404).json({ error: 'NotFound' });
+
         const user = (req as any).user as JwtPayload | undefined;
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         // Authorization: admin sees all, user sees own or if listed
         const canAccess = ((): boolean => {
             if (user.role === 'ADMIN') return true;
-            if (user.role === 'USER') return rec.ownerId === user.id || (Array.isArray(rec.viewers) && rec.viewers.some((v) => v.userId === user.id));
+            if (user.role === 'USER') return report.ownerId === user.id || (Array.isArray(report.viewers) && report.viewers.some((v) => v.userId === user.id));
             return false;
         })();
         if (!canAccess) return res.status(403).json({ error: 'Forbidden' });
@@ -145,7 +143,7 @@ export async function getReport(req: Request, res: Response) {
         if (entriesSort && typeof entriesSort === 'string') opts.entriesSort = entriesSort as any;
         if (entriesMinAmount) opts.entriesMinAmount = Number(entriesMinAmount);
 
-        let shaped = toReportView(rec, opts);
+        let shaped = toReportView(report, opts);
         if (compactBool) {
             // Remove viewers/comments from summary
             delete shaped.viewers;
@@ -166,7 +164,7 @@ export async function updateReport(req: Request, res: Response) {
         const user = (req as any).user as JwtPayload | undefined;
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
-        const existing = await repo.findById(id);
+        const existing = getReportById(id);
         if (!existing) return res.status(404).json({ error: 'NotFound' });
 
         // Role checks: USER can only update their own reports
@@ -227,7 +225,7 @@ export async function updateReport(req: Request, res: Response) {
         }
 
         try {
-            const result = await repo.update(id, updated, expectedVersion);
+            const result = modelUpdateReport(id, updated, expectedVersion);
             return res.json(toReportView(result));
         } catch (err: any) {
             if (err && err.code === 'VERSION_MISMATCH') return res.status(409).json({ error: 'VersionMismatch' });
@@ -248,7 +246,7 @@ export async function addComment(req: Request, res: Response) {
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
         if (!payload || !payload.text || typeof payload.text !== 'string') return res.status(400).json({ error: 'MissingField', message: 'text is required' });
 
-        const existing = await repo.findById(id);
+        const existing = getReportById(id);
         if (!existing) return res.status(404).json({ error: 'NotFound' });
 
         // Permission: ADMIN allowed; owner allowed; viewers with COMMENT or EDIT access allowed
@@ -269,7 +267,7 @@ export async function addComment(req: Request, res: Response) {
         };
 
         const updatedComments = [...(existing.comments || []), newComment];
-        const updated = await repo.update(id, { comments: updatedComments });
+        const updated = modelUpdateReport(id, { comments: updatedComments });
         return res.status(201).json(toReportView(updated));
     } catch (err) {
         // eslint-disable-next-line no-console
@@ -282,7 +280,7 @@ const uploadMiddleware = upload.single('attachment');
 export async function uploadAttachment(req: Request, res: Response) {
     // We execute the upload middleware manually here to handle errors
     uploadMiddleware(req, res, async (err: any) => {
-        
+
         // --- ERROR HANDLING (Multer & Validation) ---
         if (err instanceof multer.MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
@@ -301,7 +299,7 @@ export async function uploadAttachment(req: Request, res: Response) {
             console.log(`File saved to: ${req.file.path}`);
 
             const id = req.params.id;
-            const existing = await repo.findById(id);
+            const existing = getReportById(id);
             if (!existing) return res.status(404).json({ error: 'NotFound' });
 
             const user = (req as any).user as JwtPayload | undefined;
@@ -327,7 +325,7 @@ export async function uploadAttachment(req: Request, res: Response) {
             };
 
             const updatedAttachments = [...(existing.attachments || []), newAttachment];
-            const updated = await repo.update(id, { attachments: updatedAttachments });
+            const updated = modelUpdateReport(id, { attachments: updatedAttachments });
 
             return res.status(201).json(toReportView(updated));
 
@@ -344,7 +342,7 @@ export async function getAttachmentUrl(req: Request, res: Response) {
         const { id, attachmentId } = req.params;
 
         // 1. Fetch Metadata
-        const report = await repo.findById(id);
+        const report = getReportById(id);
         if (!report) return res.status(404).json({ error: 'Report not found' });
 
         const attachment = report.attachments?.find(a => a.id === attachmentId);
@@ -376,9 +374,9 @@ export async function getAttachmentUrl(req: Request, res: Response) {
         // In production, use your actual domain env variable
         const downloadUrl = `${req.protocol}://${req.get('host')}/reports/attachments/download?token=${signedToken}`;
 
-        return res.status(200).json({ 
+        return res.status(200).json({
             url: downloadUrl,
-            expiresIn: "1d" 
+            expiresIn: "1d"
         });
 
     } catch (err) {

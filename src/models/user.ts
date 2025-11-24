@@ -12,9 +12,14 @@ export interface User {
   role: Role;
 }
 
-export function findByEmail(email: string): User | undefined {
+export function getUserByEmail(email: string): User | undefined {
   return globalRepo.users.findByEmail(email);
 }
+
+export function getUserById(id: string): User | undefined {
+  return globalRepo.users.list().find((u) => u.id === id);
+}
+
 
 export function validateCreds(email: string, password: string): User | null {
   const u = globalRepo.users.findByEmail(email);

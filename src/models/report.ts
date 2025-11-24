@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import globalRepo from "../repositories/globalRepository";
 export type ReportStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+import { getUserById } from "./user";
 
 export interface ReportEntry {
   id: string;
@@ -56,6 +57,28 @@ export interface ReportView extends Report {
 }
 
 
+export function getReportsByUser(userId: string): Report[] {
+  const user = getUserById(userId);
+  if (!user) {
+    return [];
+  }
+  const allReports = globalRepo.reports.list();
+  if (user.role === 'ADMIN') {
+    return allReports;
+  } else {
+    // Users can see reports they own, or reports where they are listed as a viewer
+    return (allReports).filter((r) => r.ownerId === userId || (Array.isArray(r.viewers) && r.viewers.some((v) => v.userId === userId)));
+  }
+}
+
+export function getReportById(id: string): Report | null {
+  const report = globalRepo.reports.findById(id);
+  if (!report) {
+    return null;
+  }
+  return report;
+}
+
 export async function createReport(title: string, ownerId: string, budgetCap: number, department?: string, entries?: ReportEntry[], viewers?: { userId: string; access: 'VIEW' | 'EDIT' | 'COMMENT' }[], status?: ReportStatus, budgetOverride?: boolean): Promise<Report> {
   const now = new Date().toISOString();
 
@@ -74,17 +97,27 @@ export async function createReport(title: string, ownerId: string, budgetCap: nu
     status: status || 'DRAFT',
   } as Report;
 
-  await globalRepo.reports.add(rec);
+  globalRepo.reports.add(rec);
   return rec;
 }
 
-// get reports by user and role
-export async function getReportsByUser(userId: string, role: 'USER' | 'ADMIN'): Promise<Report[]> {
-  const allReports = globalRepo.reports.list();
-  if (role === 'ADMIN') {
-    return await allReports;
-  } else {
-    // Users can see reports they own, or reports where they are listed as a viewer
-    return (await allReports).filter((r) => r.ownerId === userId || (Array.isArray(r.viewers) && r.viewers.some((v) => v.userId === userId)));
+export function updateReport(id: string, updated: Partial<Report>, expectedVersion?: number): Report {
+  let existing = getReportById(id);
+  if (!existing) throw new Error('NotFound');
+
+  if (expectedVersion !== undefined && expectedVersion !== existing.version) {
+    const err: any = new Error('VersionMismatch');
+    err.code = 'VERSION_MISMATCH';
+    throw err;
   }
+  const now = new Date().toISOString();
+  const merged: Report = {
+    ...existing,
+    ...updated,
+    version: (existing.version ?? 0) + 1,
+    updatedAt: now,
+  } as Report;
+
+  globalRepo.reports.update(id, merged);
+  return merged;
 }

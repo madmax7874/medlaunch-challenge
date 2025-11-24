@@ -120,34 +120,20 @@ export class InMemoryReportRepository {
         for (const s of seeds) this.store.set(s.id, s);
     }
 
-    async add(report: Report): Promise<void> {
+    add(report: Report): void {
         this.store.set(report.id, report);
     }
 
-    async findById(id: string): Promise<Report | null> {
+    findById(id: string): Report | null {
         return this.store.get(id) ?? null;
     }
 
-    async update(id: string, updated: Partial<Report>, expectedVersion?: number): Promise<Report> {
-        const existing = this.store.get(id);
-        if (!existing) throw new Error('NotFound');
-        if (expectedVersion !== undefined && expectedVersion !== existing.version) {
-            const err: any = new Error('VersionMismatch');
-            err.code = 'VERSION_MISMATCH';
-            throw err;
-        }
-        const now = new Date().toISOString();
-        const merged: Report = {
-            ...existing,
-            ...updated,
-            version: (existing.version ?? 0) + 1,
-            updatedAt: now,
-        } as Report;
-        this.store.set(id, merged);
-        return merged;
+    update(id: string, updatedReport: Report): Report {
+        this.store.set(id, updatedReport);
+        return updatedReport;
     }
 
-    async list(): Promise<Report[]> {
+    list(): Report[] {
         return Array.from(this.store.values());
     }
 }
