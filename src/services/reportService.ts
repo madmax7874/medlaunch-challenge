@@ -1,8 +1,5 @@
 import { Report } from '../models/report';
 
-export function computeTotalAmount(report: Report): number {
-  return (report.entries || []).reduce((s, e) => s + (e.amount ?? 0), 0);
-}
 
 function paginate<T>(arr: T[], offset = 0, limit = 5): { items: T[]; offset: number; limit: number; total: number } {
   const total = arr.length;
@@ -56,9 +53,6 @@ export function toReportView(report: Report, options: any = {}): any {
 
   if (include.has('metrics')) data.metrics = data.metrics;
   else delete data.metrics;
-
-  // // attach pagination metadata for entries if present
-  // if (entriesPageResult) data.entriesPagination = { offset: entriesPageResult.offset, limit: entriesPageResult.limit, total: entriesPageResult.total };
 
   return data;
 }
