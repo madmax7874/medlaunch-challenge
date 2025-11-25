@@ -394,7 +394,7 @@ export async function getAttachmentUrl(req: Request, res: Response) {
             mimeType: attachment.mimetype
         };
 
-        const signedToken = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'medlaunch', { expiresIn: "1d" });
+        const signedToken = jwt.sign(tokenPayload, process.env.JWT_SECRET || 'medlaunch', { expiresIn: "3h" });
 
         // 4. Return the complete URL
         // In production, use your actual domain env variable

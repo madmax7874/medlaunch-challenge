@@ -82,7 +82,10 @@ The collection includes tests for some requests. For example, after registering 
 **Note:** Replace `YOUR_AUTH_TOKEN`, `YOUR_REPORT_ID`, and `YOUR_ATTACHMENT_ID` with actual values.
 
 *   #### Signup
-
+    **Endpoint:** `POST /auth/signup`  
+    **Description:** Registers a new user.  
+    **Request Body:** `name`, `email`, `password`.  
+    **Response:** A JWT for the new user.
     ```bash
     curl --location --request POST 'http://localhost:3000/auth/signup' \
     --header 'Content-Type: application/json' \
@@ -95,7 +98,10 @@ The collection includes tests for some requests. For example, after registering 
     ```
 
 *   #### Login
-
+    **Endpoint:** `POST /auth/login`  
+    **Description:** Logs in a user.  
+    **Request Body:** `email`, `password`.  
+    **Response:** A JWT for the user.
     ```bash
     curl --location --request POST 'http://localhost:3000/auth/login' \
     --header 'Content-Type: application/json' \
@@ -107,7 +113,11 @@ The collection includes tests for some requests. For example, after registering 
     ```
 
 *   #### Create a new report
-
+    **Endpoint:** `POST /reports`  
+    **Description:** Creates a new expense report.  
+    **Authentication:** Requires a valid JWT.  
+    **Request Body:** `title`, `budgetCap`, `department`, `entries`, `viewers`, `status`.  
+    **Response:** The newly created report object.
     ```bash
     curl --location --request POST 'http://localhost:3000/reports' \
     --header 'Authorization: Bearer YOUR_AUTH_TOKEN' \
@@ -139,21 +149,34 @@ The collection includes tests for some requests. For example, after registering 
     ```
 
 *   #### Get all reports
-
+    **Endpoint:** `GET /reports`  
+    **Description:** Retrieves a list of reports visible to the authenticated user.  
+    **Authentication:** Requires a valid JWT.  
+    **Response:** An array of report objects.
     ```bash
     curl --location --request GET 'http://localhost:3000/reports' \
     --header 'Authorization: Bearer YOUR_AUTH_TOKEN'
     ```
 
 *   #### Get a specific report
-
+    **Endpoint:** `GET /reports/:id`  
+    **Description:** Retrieves a single report by its ID.  
+    **Authentication:** Requires a valid JWT.  
+    **URL Parameters:** `id` (the report ID).  
+    **Query Parameters (optional):** `include` (comma-separated list of fields to include), `offset`, `limit` (for pagination of entries), `entriesSort`, `entriesMinAmount`.  
+    **Response:** The report object.
     ```bash
     curl --location --request GET 'http://localhost:3000/reports/YOUR_REPORT_ID?include=entries,comments,metadata&offset=0&limit=2&entriesSort=amount_desc&entriesMinAmount=100' \
     --header 'Authorization: Bearer YOUR_AUTH_TOKEN'
     ```
 
 *   #### Upload an attachment
-
+    **Endpoint:** `POST /reports/:id/attachment`  
+    **Description:** Uploads a file as an attachment to a report.  
+    **Authentication:** Requires a valid JWT.  
+    **URL Parameters:** `id` (the report ID).  
+    **Request Body:** `multipart/form-data` with a file field named `attachment`.  
+    **Response:** The updated report object with the new attachment metadata.
     ```bash
     curl --location --request POST 'http://localhost:3000/reports/YOUR_REPORT_ID/attachment' \
     --header 'Authorization: Bearer YOUR_AUTH_TOKEN' \
@@ -161,14 +184,23 @@ The collection includes tests for some requests. For example, after registering 
     ```
 
 *   #### Get a signed URL for an attachment
-
+    **Endpoint:** `GET /reports/:id/attachments/:attachmentId/url`  
+    **Description:** Generates a temporary, signed URL to download a report attachment.  
+    **Authentication:** Requires a valid JWT.  
+    **URL Parameters:** `id` (the report ID), `attachmentId` (the attachment ID).  
+    **Response:** An object containing the `url` and `expiresIn`.
     ```bash
     curl --location --request GET 'http://localhost:3000/reports/YOUR_REPORT_ID/attachments/YOUR_ATTACHMENT_ID/url' \
     --header 'Authorization: Bearer YOUR_AUTH_TOKEN'
     ```
 
 *   #### Update a report
-
+    **Endpoint:** `PUT /reports/:id`  
+    **Description:** Updates an existing report.  
+    **Authentication:** Requires a valid JWT.  
+    **URL Parameters:** `id` (the report ID).  
+    **Request Body:** The fields to update (e.g., `title`, `status`), and the `version` of the report for optimistic concurrency control.  
+    **Response:** The updated report object.
     ```bash
     curl --location --request PUT 'http://localhost:3000/reports/YOUR_REPORT_ID' \
     --header 'Authorization: Bearer YOUR_AUTH_TOKEN' \
