@@ -102,7 +102,7 @@
 			]
 		},
 		{
-			"name": "reports",
+			"name": "All Reports",
 			"event": [
 				{
 					"listen": "test",
@@ -141,7 +141,7 @@
 			"response": []
 		},
 		{
-			"name": "report",
+			"name": "Report",
 			"event": [
 				{
 					"listen": "test",
@@ -210,6 +210,77 @@
 							"value": "100",
 							"description": "Numeric filter; only include entries with amount >= entriesMinAmount"
 						}
+					],
+					"variable": [
+						{
+							"key": "reportId",
+							"value": "{{reportId}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Create report",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"title\": \"Q4 Marketing Expenses\",\r\n    \"budgetCap\": 5000,\r\n    \"department\": \"Marketing\",\r\n    \"entries\": [\r\n        {\r\n            \"id\": \"entry1\",\r\n            \"title\": \"Social Media Ads\",\r\n            \"amount\": 2500,\r\n            \"date\": \"2025-10-15\"\r\n        },\r\n        {\r\n            \"id\": \"entry2\",\r\n            \"title\": \"Content Creation\",\r\n            \"amount\": 1500,\r\n            \"date\": \"2025-10-20\"\r\n        }\r\n    ],\r\n    \"viewers\": [\r\n        \"user2@med.com\"\r\n    ],\r\n    \"status\": \"DRAFT\"\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/reports",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"reports"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update report",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"title\": \"Updated Q3 Departmental Expenses\",\r\n    \"status\": \"SUBMITTED\",\r\n    \"version\": {{reportVersion}}\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/reports/:reportId",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"reports",
+						":reportId"
 					],
 					"variable": [
 						{
@@ -295,45 +366,6 @@
 						{
 							"key": "attachmentId",
 							"value": "{{attachmentId}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Update report",
-			"request": {
-				"method": "PUT",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer {{authToken}}"
-					},
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\r\n    \"title\": \"Updated Q3 Departmental Expenses\",\r\n    \"status\": \"SUBMITTED\",\r\n    \"version\": {{reportVersion}}\r\n}"
-				},
-				"url": {
-					"raw": "http://localhost:3000/reports/:reportId",
-					"protocol": "http",
-					"host": [
-						"localhost"
-					],
-					"port": "3000",
-					"path": [
-						"reports",
-						":reportId"
-					],
-					"variable": [
-						{
-							"key": "reportId",
-							"value": "{{reportId}}"
 						}
 					]
 				}
