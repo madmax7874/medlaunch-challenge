@@ -76,7 +76,7 @@ A key business rule is the "Strict Budget Gate," which governs the submission of
 - **Storage**: Files are stored on the local filesystem in the `./uploads` directory.
 - **Security**:
   - Files are renamed to random UUIDs to prevent directory traversal and filename collision attacks.
-  - File types are restricted to a whitelist (e.g., PDF, PNG, JPEG).
+  - File types are restricted to a whitelist (e.g. PDF here).
   - A file size limit is enforced.
 - **Download**: To prevent unauthorized access, file downloads are facilitated through a signed, short-lived URL. This URL contains a JWT that encodes the file's path and expires after a set time.
 
