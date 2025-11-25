@@ -1,106 +1,98 @@
-1. Domain & Data Model
-To satisfy the requirement of a complex resource with nested collections, I have modeled a Project Expense Report.
+# MedLaunch Expense Report API Design
 
-Schema Overview
-We utilize a Document-Oriented (NoSQL) structure. This was chosen over a relational model to allow the entries (line items) to be embedded directly within the Report. This optimizes read performance, as reports are typically fetched in their entirety.
+This document outlines the architecture and design of the MedLaunch Expense Report API.
 
-Root Object: Report (Contains metadata, status, and budget rules).
+## 1. Domain & Data Model
 
-Nested Collection: entries (Array of individual expense items).
+The API is modeled around a central `Report` resource, which represents an expense report. A Document-Oriented (NoSQL) structure was chosen to embed related data like entries and comments directly within the report, optimizing for read performance.
 
-Computed Fields: totalAmount and isOverBudget are calculated at runtime during GET requests to ensure data consistency without requiring multi-step updates.
+### Schema Overview
 
-2. Custom Business Rule 
+- **`Report`**: The root object containing metadata, status, and budget information.
+  - `id: string` - Unique identifier.
+  - `title: string` - Title of the report.
+  - `ownerId: string` - ID of the user who owns the report.
+  - `department?: string` - Department associated with the report.
+  - `createdAt: string` - ISO timestamp of creation.
+  - `updatedAt: string` - ISO timestamp of the last update.
+  - `version: number` - Version number for optimistic concurrency control.
+  - `budgetCap: number` - The budget limit for the report.
+  - `budgetOverride?: boolean` - If true, allows exceeding the budget.
+  - `status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'` - The current status of the report.
+  - `entries: ReportEntry[]` - An array of expense entries.
+  - `users?: { userId: string; access: 'VIEW' | 'EDIT' | 'COMMENT' }[]` - Users with specific access rights to the report.
+  - `comments?: ReportComment[]` - An array of comments on the report.
+  - `attachments?: ReportAttachment[]` - An array of file attachments.
+  - `metrics?: ReportView` - Computed metrics like total amount and trend.
 
+- **`ReportEntry`**: An individual expense item.
+  - `id: string`
+  - `description?: string`
+  - `amount: number`
+  - `category?: string`
+  - `incurredAt?: string`
 
-I have implemented a rule called "The Strict Budget Gate."
+- **`User`**: A user of the system.
+  - `id: string`
+  - `name: string`
+  - `email: string`
+  - `password: string` (hashed)
+  - `role: 'USER' | 'ADMIN'`
 
-The Rule: A Report cannot be transitioned from DRAFT to SUBMITTED status if the calculated sum of its entries exceeds the budgetCap defined on the report.
+- **`ReportComment`**: A comment on a report.
+- **`ReportAttachment`**: A file attached to a report.
+- **`ReportView`**: Computed metrics for a report.
 
-The Exception: This invariant can be bypassed only if the budgetOverride boolean is set to true.
+## 2. Custom Business Rule: The Strict Budget Gate
 
-Role Restriction: Only users with the ADMIN role can set budgetOverride to true.
+A key business rule is the "Strict Budget Gate," which governs the submission of expense reports.
 
-Impact: This affects the PUT validation logic. Before saving a status change, the system effectively "re-calculates" the total to ensure the invariant holds.
+**The Rule**: A `Report` cannot be transitioned from `DRAFT` to `SUBMITTED` status if the sum of its `entries` exceeds the `budgetCap`.
 
-3. Architecture & Assumptions 
+**The Exception**: This rule can be bypassed if the `budgetOverride` flag is set to `true`.
 
+**Role Restriction**: Only users with the `ADMIN` role can set `budgetOverride` to `true`.
 
-Assumptions
-Transport Security: We assume the API sits behind a reverse proxy (like Nginx) or Load Balancer terminating TLS (HTTPS).
+**Enforcement**: This rule is enforced in two scenarios:
+1.  When a new report is created with the status `SUBMITTED`.
+2.  When an existing report's status is updated from `DRAFT` to `SUBMITTED`.
 
+## 3. Architecture & Assumptions
 
-Storage: As per requirements, persistence is in-memory for this challenge. However, the data access layer is implemented using the Repository Pattern. This ensures that swapping the in-memory Map for a real database (like MongoDB or DynamoDB) would require changing only the Repository implementation, not the business logic.
+- **Transport Security**: The API assumes it is deployed behind a reverse proxy (e.g., Nginx) that handles TLS (HTTPS) termination.
+- **Storage**: The application uses an in-memory database for this challenge, implemented via a `globalRepository`. The Repository Pattern is used to abstract data access, allowing for a future switch to a persistent database (like MongoDB or DynamoDB) with minimal changes to the business logic.
+- **Concurrency Control**: Optimistic Concurrency Control (OCC) is used to handle simultaneous edits. Each `Report` has a `version` number. To update a report, a client must provide the `version` they are editing. If the server has a newer version, it rejects the update with a `409 Conflict` error, preventing lost updates.
 
+## 4. Authentication & Authorization
 
-Concurrency Control 
+- **Authentication**: Authentication is handled via JSON Web Tokens (JWT). Clients must include a bearer token in the `Authorization` header of their requests.
+- **Authorization**: Role-Based Access Control (RBAC) is used to restrict access to resources.
+  - **`USER`**: Can create reports for themselves, view reports they own or are shared with, and update their own reports.
+  - **`ADMIN`**: Has full access to all reports, can change a report's owner, and can set the `budgetOverride` flag.
 
+## 5. File Storage Strategy
 
+- **Mechanism**: File uploads are handled using `multipart/form-data` and the `multer` library.
+- **Storage**: Files are stored on the local filesystem in the `./uploads` directory.
+- **Security**:
+  - Files are renamed to random UUIDs to prevent directory traversal and filename collision attacks.
+  - File types are restricted to a whitelist (e.g., PDF, PNG, JPEG).
+  - A file size limit is enforced.
+- **Download**: To prevent unauthorized access, file downloads are facilitated through a signed, short-lived URL. This URL contains a JWT that encodes the file's path and expires after a set time.
 
-To handle simultaneous edits (e.g., two managers editing a report), I implemented Optimistic Concurrency Control (OCC).
+## 6. Asynchronous Side Effects
 
-Every resource has a version integer.
+- **Trigger**: When a `Report` is created or updated, asynchronous side effects are triggered to perform tasks that should not block the user's request.
+- **Implementation**: An in-memory `JobQueueService` is used to manage these tasks. For example, when a report is created, two jobs are enqueued:
+  1.  `UPDATE_REPORT_VIEW`: Calculates and updates the `metrics` for the report.
+  2.  `REPORT_CREATED_NOTIFICATION`: Simulates sending a notification about the new report.
+- **Justification**: This ensures that the API remains responsive, providing a fast response to the user while background tasks are processed independently.
 
-GET responses include the current version.
+## 7. Code Quality & Scalability
 
-PUT requests must include an If-Match header (or version in body).
-
-If request.version !== server.version, the server rejects the update with 409 Conflict.
-
-Justification: This is superior to locking (pessimistic) for web APIs as it is stateless and prevents "zombie" locks.
-
-4. Authentication & Authorization 
-
-
-Authentication: Bearer Token (JWT).
-
-Authorization: Role-Based Access Control (RBAC).
-
-USER: Can read reports they own or are listed on (GET), and create/edit their own reports (POST/PUT).
-
-ADMIN: Can edit any report and toggle the budgetOverride flag.
-
-5. File Storage Strategy 
-
-
-Mechanism: multipart/form-data uploads via multer.
-
-Storage Abstraction: Files are currently stored on the local filesystem (./uploads).
-
-Security:
-
-Files are renamed to random UUIDs to prevent directory traversal attacks and filename collisions.
-
-MIME types are validated against a whitelist (PDF, PNG, JPEG).
-
-Download: Access is granted via a signed, short-lived URL (simulated via a temporary token endpoint) to prevent public hot-linking.
-
-6. Asynchronous Side Effects 
-
-
-Trigger: When a Report is created (POST), a "Notification" side effect is triggered.
-
-Implementation: An in-memory Event Emitter (node:events) decouples the HTTP response from the background task.
-
-Failure Handling:
-
-The side effect is wrapped in a retry mechanism (Exponential Backoff).
-
-If the side effect fails 3 times, it logs to a Dead Letter error stream for manual intervention.
-
-Justification: This ensures the API remains responsive (fast 201 Created) even if the notification system is slow or down.
-
-7. Code Quality & Scalability 
-
-
-Linting: ESLint with strict TypeScript configuration ensures no implicit any types.
-
-Separation of Concerns: logic is split into Controllers (HTTP layer), Services (Business Logic), and Repositories (Data Access).
-
-Scalability Plan:
-
-State: The app is stateless (tokens are self-contained JWTs).
-
-Data: The Repository pattern allows sharding or migrating to a document store.
-
-Observability: Structured JSON logging (via winston/pino) allows logs to be ingested by tools like Splunk or Datadog.
+- **Linting**: ESLint with a strict TypeScript configuration is used to maintain code quality and prevent common errors.
+- **Separation of Concerns**: The codebase is structured to separate concerns into controllers (HTTP layer), services (business logic), and repositories (data access).
+- **Scalability**:
+  - The application is stateless, with JWTs containing all necessary authentication information.
+  - The use of the Repository Pattern allows for easy migration to a more scalable database solution.
+  - Structured JSON logging can be implemented to allow for easy log ingestion by monitoring tools.

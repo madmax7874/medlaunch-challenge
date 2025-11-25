@@ -1,16 +1,7 @@
-import { Report, ReportView } from '../models/report';
+import { Report } from '../models/report';
 
 export function computeTotalAmount(report: Report): number {
   return (report.entries || []).reduce((s, e) => s + (e.amount ?? 0), 0);
-}
-
-export interface ViewOptions {
-  include?: string[]; // e.g., ['entries','comments','metadata']
-  compact?: boolean; // compact flattened view
-  offset?: number;
-  limit?: number;
-  entriesSort?: 'amount_desc' | 'amount_asc' | 'date_desc' | 'date_asc';
-  entriesMinAmount?: number;
 }
 
 function paginate<T>(arr: T[], offset = 0, limit = 5): { items: T[]; offset: number; limit: number; total: number } {
@@ -20,8 +11,7 @@ function paginate<T>(arr: T[], offset = 0, limit = 5): { items: T[]; offset: num
   return { items: arr.slice(off*lim, off*lim + lim), offset: off, limit: lim, total };
 }
 
-export function toReportView(report: Report, opts?: ViewOptions): any {
-  const options: ViewOptions = opts || {};
+export function toReportView(report: Report, options: any = {}): any {
   const include = new Set(options.include || ['entries', 'comments', 'metadata', 'metrics']);
 
   // Process entries: filtering, sorting, pagination

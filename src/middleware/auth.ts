@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, Role } from '../models/user';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+const JWT_SECRET = process.env.JWT_SECRET || 'medlaunch';
 
 export interface JwtPayload {
   id: string;

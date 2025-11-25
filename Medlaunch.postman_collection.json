@@ -1,0 +1,344 @@
+{
+	"info": {
+		"_postman_id": "8af10155-8bad-4b1c-8c3d-beaf3ba810b7",
+		"name": "Medlaunch",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "49904944"
+	},
+	"item": [
+		{
+			"name": "auth",
+			"item": [
+				{
+					"name": "login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();\r",
+									"if (jsonData.token) {\r",
+									"    pm.globals.set(\"authToken\", jsonData.token);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"email\":\"user1@med.com\",\"password\":\"User!No1\"}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/auth/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Sign up",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();\r",
+									"if (jsonData.token) {\r",
+									"    pm.globals.set(\"authToken\", jsonData.token);\r",
+									"}\r",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"name\":\"Viewer 1\",\"email\":\"viewer1@med.com\",\"password\":\"V!ewer1\"}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/auth/signup",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"auth",
+								"signup"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "reports",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();\r",
+							"if (jsonData && jsonData.length > 0 && jsonData[0].id) {\r",
+							"    pm.globals.set(\"reportId\", jsonData[0].id);\r",
+							"}"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/reports",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"reports"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "report",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var responseJSON = pm.response.json();\r",
+							"\r",
+							"pm.test(\"Log attachment id to console\", function () {\r",
+							"    pm.globals.set(\"attachmentId\", responseJSON.attachments ? responseJSON.attachments[0].id : null);\r",
+							"    pm.globals.set(\"reportVersion\", responseJSON.version)\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/reports/:reportId?include=entries,comments,metadata&offset=0&limit=2&entriesSort=amount_desc&entriesMinAmount=100",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"reports",
+						":reportId"
+					],
+					"query": [
+						{
+							"key": "include",
+							"value": "entries,comments,metadata",
+							"description": "Comma-separated list of sections to include in the response. Options: entries, comments, metadata, metrics, viewers."
+						},
+						{
+							"key": "compact",
+							"value": "1",
+							"description": "Summary toggle. Use yes to return a compact summary (computed totals, metrics, no viewers or comments). Any other value or omitted => full response. Example: compact=1.",
+							"disabled": true
+						},
+						{
+							"key": "offset",
+							"value": "0",
+							"description": "Zero-based start index for entries (pagination). Integer >= 0."
+						},
+						{
+							"key": "limit",
+							"value": "2",
+							"description": "Maximum number of entries to return (pagination). Integer >= 1."
+						},
+						{
+							"key": "entriesSort",
+							"value": "amount_desc",
+							"description": "Sort order for entries. Allowed: amount_desc, amount_asc, date_desc, date_asc."
+						},
+						{
+							"key": "entriesMinAmount",
+							"value": "100",
+							"description": "Numeric filter; only include entries with amount >= entriesMinAmount"
+						}
+					],
+					"variable": [
+						{
+							"key": "reportId",
+							"value": "{{reportId}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Upload attachment",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "attachment",
+							"type": "file",
+							"src": "/C:/Users/Rushabh/Downloads/Code Challenge BE 2.pdf"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:3000/reports/:reportId/attachment",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"reports",
+						":reportId",
+						"attachment"
+					],
+					"variable": [
+						{
+							"key": "reportId",
+							"value": "{{reportId}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Signed attachment URL",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3000/reports/:reportId/attachments/:attachmentId/url",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"reports",
+						":reportId",
+						"attachments",
+						":attachmentId",
+						"url"
+					],
+					"variable": [
+						{
+							"key": "reportId",
+							"value": "{{reportId}}"
+						},
+						{
+							"key": "attachmentId",
+							"value": "{{attachmentId}}"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update report",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{authToken}}"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"title\": \"Updated Q3 Departmental Expenses\",\r\n    \"status\": \"SUBMITTED\",\r\n    \"version\": {{reportVersion}}\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:3000/reports/:reportId",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"reports",
+						":reportId"
+					],
+					"variable": [
+						{
+							"key": "reportId",
+							"value": "{{reportId}}"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
