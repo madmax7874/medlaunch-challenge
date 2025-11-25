@@ -39,9 +39,8 @@ This is the backend for the MedLaunch code challenge. It's a Node.js and Express
 
 The project follows a modular architecture, separating concerns into different directories:
 
--   `src/controllers`: Handles the incoming requests, validates input, and calls the appropriate services.
--   `src/services`: Contains the core business logic of the application.
-    -   `reportService.ts`: Manages the logic for creating, processing, and retrieving reports.
+-   `src/controllers`: Handles the incoming requests, validates input, and contains the majority of the application's business logic.
+-   `src/services`: Contains services that provide specific functionalities like Asyncrhonous Job queueing, or file storage service.
     -   `fileStorageService.ts`: A simple in-memory storage for files. For a production environment, this would be replaced with a more robust solution like Amazon S3 or a local filesystem-based storage.
     -   `jobQueueService.ts`: A mock job queue for "processing" reports. This simulates a background task by introducing a delay, after which the report status is updated. In a real-world application, this would be implemented with a dedicated queueing system like RabbitMQ or Redis.
 -   `src/repositories`: Abstract the data layer.
@@ -53,14 +52,14 @@ The project follows a modular architecture, separating concerns into different d
 
 ### Dependencies Used
 
--   **Express**: A minimal and flexible Node.js web application framework that provides a robust set of features for web and mobile applications.
--   **TypeScript**: A typed superset of JavaScript that compiles to plain JavaScript. It helps in building more robust and maintainable applications.
--   **bcryptjs**: A library for hashing passwords.
--   **jsonwebtoken**: For generating and verifying JSON Web Tokens (JWTs) for authentication.
--   **cors**: A package for providing a Connect/Express middleware that can be used to enable CORS with various options.
--   **morgan**: A HTTP request logger middleware for node.js.
--   **multer**: A node.js middleware for handling `multipart/form-data`, which is primarily used for uploading files.
--   **ts-node-dev**: A tool that compiles your TypeScript application and restarts your server when you change a file.
+-   **Express**: Used to build the web server and define the API routes. It's the foundation of the application's communication over HTTP.
+-   **TypeScript**: Used to write type-safe code. This helps to catch errors during development and improves code quality and maintainability.
+-   **bcryptjs**: Used for security to hash user passwords before storing them. This prevents storing passwords in plaintext.
+-   **jsonwebtoken**: Used to implement stateless authentication. After a user logs in, a JWT is created and sent to the client. This token is then used to authenticate subsequent requests.
+-   **cors**: A middleware to enable Cross-Origin Resource Sharing. This is necessary if the frontend is served from a different domain than the backend.
+-   **morgan**: A middleware for logging HTTP requests. This is useful for debugging and monitoring server activity.
+-   **multer**: A middleware for handling file uploads (`multipart/form-data`). It's used in this project for uploading report attachments.
+-   **nodemon**: A development tool that automatically recompiles and restarts the server when TypeScript files are changed, speeding up the development workflow.
 
 ## API Testing with Postman
 
