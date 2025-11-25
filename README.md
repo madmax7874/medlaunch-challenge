@@ -6,7 +6,7 @@ This is the backend for the MedLaunch code challenge. It's a Node.js and Express
 
 ### Prerequisites
 
--   Node.js (v18 or higher recommended)
+-   Node.js (I used LTS: v24.11.1 for this challenge)
 -   npm
 
 ### Installation
@@ -65,7 +65,7 @@ The project follows a modular architecture, separating concerns into different d
 
 A Postman collection is included in the root of the project: `Medlaunch.postman_collection.json`.
 
-You can import this collection into Postman to easily test the API endpoints.
+You can import this collection into Postman to easily test the API endpoints. There are tests which store the IDs so that testing is easier (without manually placing tokens and IDs for each API)
 
 ### Using the Collection
 
