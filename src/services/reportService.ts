@@ -1,5 +1,8 @@
 import { Report } from '../models/report';
 
+export function computeTotalAmount(report: Report): number {
+  return (report.entries || []).reduce((s, e) => s + (e.amount ?? 0), 0);
+}
 
 function paginate<T>(arr: T[], offset = 0, limit = 5): { items: T[]; offset: number; limit: number; total: number } {
   const total = arr.length;
