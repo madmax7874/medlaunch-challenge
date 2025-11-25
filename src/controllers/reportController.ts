@@ -24,6 +24,67 @@ export async function listReports(req: Request, res: Response) {
     }
 }
 
+export async function getReport(req: Request, res: Response) {
+    try {
+        const id = req.params.id;
+        const report = getReportById(id);
+        if (!report) return res.status(404).json({ error: 'NotFound' });
+
+        const user = (req as any).user as JwtPayload;
+        if (!user) return res.status(401).json({ error: 'Unauthorized' });
+
+        // Authorization: admin sees all, user sees own or if listed
+        const canAccess = ((): boolean => {
+            if (user.role === 'ADMIN') return true;
+            if (user.role === 'USER') return report.ownerId === user.id || (Array.isArray(report.users) && report.users.some((v) => v.userId === user.id));
+            return false;
+        })();
+        if (!canAccess) return res.status(403).json({ error: 'Forbidden' });
+
+        // Parse view options from query params
+        const { include, compact, offset, limit, entriesSort, entriesMinAmount } = req.query || {};
+        const includeList = typeof include === 'string' ? include.split(',').map((s) => s.trim()) : undefined;
+        const compactBool = compact === '1';
+        const opts: any = {
+            include: includeList,
+            compact: compactBool,
+        };
+        if (offset) opts.offset = Number(offset);
+        if (limit) opts.limit = Number(limit);
+        if (entriesSort && typeof entriesSort === 'string') opts.entriesSort = entriesSort as any;
+        if (entriesMinAmount) opts.entriesMinAmount = Number(entriesMinAmount);
+
+        let shaped = toReportView(report, opts);
+        if (compactBool) {
+            // Remove viewers/comments from summary
+            delete shaped.viewers;
+            delete shaped.comments;
+        }
+        return res.json(shaped);
+    } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(err);
+        return res.status(500).json({ error: 'InternalError' });
+    }
+}
+
+
+export function validatePayload(payload: any): { correct: boolean, message?: string } {
+    // validate if status is correct
+    const validStatuses = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'];
+    if (payload.status && !validStatuses.includes(payload.status)) {
+        return { correct: false, message: 'Invalid status value' };
+    }
+
+    // validate some more fields as needed
+    if (payload.budgetOverride && typeof payload.budgetOverride !== 'boolean') {
+        return { correct: false, message: 'budgetOverride must be a boolean' };
+    }
+
+    return { correct: true, message: "Payload is valid" };
+}
+
+
 export async function createReport(req: Request, res: Response) {
     try {
         const payload = req.body;
@@ -43,6 +104,12 @@ export async function createReport(req: Request, res: Response) {
         // Prevent non-admins from setting budgetOverride to true
         if (payload.budgetOverride === true && (user.role !== 'ADMIN')) {
             return res.status(403).json({ error: 'Forbidden', message: 'Only ADMIN may set budgetOverride' });
+        }
+
+        // run validatePayload
+        const validation = validatePayload(payload);
+        if (!validation.correct) {
+            return res.status(400).json({ error: 'InvalidPayload', message: validation.message });
         }
 
         // If creating in SUBMITTED state, enforce Strict Budget Gate
@@ -107,50 +174,6 @@ export async function createReport(req: Request, res: Response) {
     }
 }
 
-export async function getReport(req: Request, res: Response) {
-    try {
-        const id = req.params.id;
-        const report = getReportById(id);
-        if (!report) return res.status(404).json({ error: 'NotFound' });
-
-        const user = (req as any).user as JwtPayload;
-        if (!user) return res.status(401).json({ error: 'Unauthorized' });
-
-        // Authorization: admin sees all, user sees own or if listed
-        const canAccess = ((): boolean => {
-            if (user.role === 'ADMIN') return true;
-            if (user.role === 'USER') return report.ownerId === user.id || (Array.isArray(report.users) && report.users.some((v) => v.userId === user.id));
-            return false;
-        })();
-        if (!canAccess) return res.status(403).json({ error: 'Forbidden' });
-
-        // Parse view options from query params
-        const { include, compact, offset, limit, entriesSort, entriesMinAmount } = req.query || {};
-        const includeList = typeof include === 'string' ? include.split(',').map((s) => s.trim()) : undefined;
-        const compactBool = compact === '1';
-        const opts: any = {
-            include: includeList,
-            compact: compactBool,
-        };
-        if (offset) opts.offset = Number(offset);
-        if (limit) opts.limit = Number(limit);
-        if (entriesSort && typeof entriesSort === 'string') opts.entriesSort = entriesSort as any;
-        if (entriesMinAmount) opts.entriesMinAmount = Number(entriesMinAmount);
-
-        let shaped = toReportView(report, opts);
-        if (compactBool) {
-            // Remove viewers/comments from summary
-            delete shaped.viewers;
-            delete shaped.comments;
-        }
-        return res.json(shaped);
-    } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error(err);
-        return res.status(500).json({ error: 'InternalError' });
-    }
-}
-
 export async function updateReport(req: Request, res: Response) {
     try {
         const id = req.params.id;
@@ -177,6 +200,11 @@ export async function updateReport(req: Request, res: Response) {
         // Only ADMIN may set budgetOverride to true
         if (payload.budgetOverride === true && user.role !== 'ADMIN') {
             return res.status(403).json({ error: 'Forbidden', message: 'Only ADMIN may set budgetOverride' });
+        }
+
+        const validation = validatePayload(payload);
+        if (!validation.correct) {
+            return res.status(400).json({ error: 'InvalidPayload', message: validation.message });
         }
 
         // Determine expected version from If-Match header or body.version
