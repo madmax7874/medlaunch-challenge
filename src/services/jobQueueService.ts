@@ -1,8 +1,5 @@
-/**
- * A placeholder for a robust job queue service.
- * In a real-world application, this service would interface with a message
- * queue system like RabbitMQ, AWS SQS, or Google Cloud Pub/Sub.
- */
+import { updateReportView } from "../models/report";
+
 
 export interface Job {
     type: string;
@@ -10,19 +7,22 @@ export interface Job {
 }
 
 class JobQueueService {
-    /**
-     * Enqueues a job for background processing.
-     * @param job The job to enqueue.
-     *
-     * This method should be highly reliable and fast. It serializes the job
-     * and sends it to the message queue. It should not throw an error unless
-     * the queue is fundamentally unreachable, in which case a monitoring
-     * alert should be triggered.
-     */
-    async enqueue(job: Job): Promise<void> {
+
+    enqueue(job: Job): void {
         // In a real implementation, this would send the job to a message broker.
         console.log(`[JobQueueService] Enqueued job: ${job.type}`, job.payload);
-        // This is where you might use a library like 'amqplib' for RabbitMQ or an AWS/GCP SDK.
+
+        // --- Worker Simulation ---
+        // In a real app, a separate worker process would listen to the queue.
+        // To simulate this, we process the job immediately but do not await it.
+        this.processJob(job);
+    }
+
+    private async processJob(job: Job) {
+        if (job.type === 'UPDATE_REPORT_VIEW') {
+            await updateReportView(job.payload.reportId);
+        }
+        // Other job types like 'REPORT_CREATED_NOTIFICATION' would be handled here.
     }
 }
 

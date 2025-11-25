@@ -67,7 +67,7 @@ export class InMemoryReportRepository {
                     { id: randomUUID(), description: 'Hotel', amount: 800, incurredAt: now },
                     { id: randomUUID(), description: 'Catering', amount: 300, incurredAt: now },
                 ],
-                viewers: [{ userId: seededUserIds.user2, access: 'VIEW' }],
+                users: [{ userId: seededUserIds.user2, access: 'VIEW' }],
                 comments: [
                     { id: randomUUID(), authorId: seededUserIds.user1, text: 'Initial plan looks good', createdAt: now, priority: 'normal' },
                 ],
@@ -88,7 +88,7 @@ export class InMemoryReportRepository {
                     { id: randomUUID(), description: 'Booth', amount: 700, incurredAt: now },
                     { id: randomUUID(), description: 'Travel', amount: 600, incurredAt: now },
                 ],
-                viewers: [{ userId: seededUserIds.user2, access: 'VIEW' }],
+                users: [{ userId: seededUserIds.user2, access: 'VIEW' }],
                 comments: [
                     { id: randomUUID(), authorId: seededUserIds.admin1, text: 'Submitted for approval', createdAt: now, priority: 'high' },
                 ],
@@ -108,7 +108,7 @@ export class InMemoryReportRepository {
                 entries: [
                     { id: randomUUID(), description: 'Laptops', amount: 3200, incurredAt: now },
                 ],
-                viewers: [{ userId: seededUserIds.user2, access: 'VIEW' }],
+                users: [{ userId: seededUserIds.user2, access: 'VIEW' }],
                 comments: [
                     { id: randomUUID(), authorId: seededUserIds.user2, text: 'Procurement started', createdAt: now, priority: 'normal' },
                 ],

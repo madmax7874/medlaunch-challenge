@@ -27,23 +27,21 @@ export async function listReports(req: Request, res: Response) {
 export async function createReport(req: Request, res: Response) {
     try {
         const payload = req.body;
-        const user = (req as any).user as JwtPayload | undefined;
+        const user = (req as any).user as JwtPayload;
         if (!payload || !payload.title || typeof payload.budgetCap !== 'number') {
             return res.status(400).json({ error: 'Missing required fields: title, budgetCap' });
         }
 
         // Determine ownerId: prefer payload.ownerId, but if not present, use authenticated user
-        let ownerId = payload.ownerId;
-        if (!ownerId && user) ownerId = user.id;
-        if (!ownerId) return res.status(400).json({ error: 'ownerId required or authentication required' });
+        let ownerId = payload.ownerId || user.id;
 
         // Role enforcement: non-admin USERS may only create reports for themselves
-        if (user && user.role === 'USER' && ownerId !== user.id) {
+        if (user.role === 'USER' && ownerId !== user.id) {
             return res.status(403).json({ error: 'Users may only create reports for themselves' });
         }
 
         // Prevent non-admins from setting budgetOverride to true
-        if (payload.budgetOverride === true && (!user || user.role !== 'ADMIN')) {
+        if (payload.budgetOverride === true && (user.role !== 'ADMIN')) {
             return res.status(403).json({ error: 'Forbidden', message: 'Only ADMIN may set budgetOverride' });
         }
 
@@ -90,14 +88,10 @@ export async function createReport(req: Request, res: Response) {
         // This happens after the report is successfully created but before we respond to the client.
         // The `enqueue` operation should be fast and not block the response.
         try {
-            await JobQueueService.enqueue({
-                type: 'REPORT_CREATED',
-                payload: {
-                    reportId: rec.id,
-                    ownerId: rec.ownerId,
-                    createdAt: rec.createdAt,
-                },
-            });
+            // This is a fire-and-forget call. The API does not wait for the view to be generated.
+            JobQueueService.enqueue({ type: 'UPDATE_REPORT_VIEW', payload: { reportId: rec.id } });
+            JobQueueService.enqueue({ type: 'REPORT_CREATED_NOTIFICATION', payload: { reportId: rec.id, ownerId: rec.ownerId } });
+
         } catch (jobError) {
             // If enqueuing fails, it's a critical issue (e.g., message broker is down).
             // We should log this as a high-priority error for immediate investigation.
@@ -119,13 +113,13 @@ export async function getReport(req: Request, res: Response) {
         const report = getReportById(id);
         if (!report) return res.status(404).json({ error: 'NotFound' });
 
-        const user = (req as any).user as JwtPayload | undefined;
+        const user = (req as any).user as JwtPayload;
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         // Authorization: admin sees all, user sees own or if listed
         const canAccess = ((): boolean => {
             if (user.role === 'ADMIN') return true;
-            if (user.role === 'USER') return report.ownerId === user.id || (Array.isArray(report.viewers) && report.viewers.some((v) => v.userId === user.id));
+            if (user.role === 'USER') return report.ownerId === user.id || (Array.isArray(report.users) && report.users.some((v) => v.userId === user.id));
             return false;
         })();
         if (!canAccess) return res.status(403).json({ error: 'Forbidden' });
@@ -161,7 +155,7 @@ export async function updateReport(req: Request, res: Response) {
     try {
         const id = req.params.id;
         const payload = req.body as Partial<Report> & { version?: number };
-        const user = (req as any).user as JwtPayload | undefined;
+        const user = (req as any).user as JwtPayload;
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         const existing = getReportById(id);
@@ -173,12 +167,13 @@ export async function updateReport(req: Request, res: Response) {
         }
 
         // normalize viewers: accept array of strings or array of objects
-        let viewersNormalized: any[] | undefined;
-        if (Array.isArray(payload.viewers)) {
-            const arr = payload.viewers as any[];
-            if (arr.length > 0 && typeof arr[0] === 'string') viewersNormalized = arr.map((u: string) => ({ userId: u, access: 'VIEW' }));
-            else viewersNormalized = arr;
+        let usersNormalized: any[] | undefined;
+        if (Array.isArray(payload.users)) {
+            const arr = payload.users as any[];
+            if (arr.length > 0 && typeof arr[0] === 'string') usersNormalized = arr.map((u: string) => ({ userId: u, access: 'VIEW' }));
+            else usersNormalized = arr;
         }
+
         // Only ADMIN may set budgetOverride to true
         if (payload.budgetOverride === true && user.role !== 'ADMIN') {
             return res.status(403).json({ error: 'Forbidden', message: 'Only ADMIN may set budgetOverride' });
@@ -203,7 +198,7 @@ export async function updateReport(req: Request, res: Response) {
         if (payload.budgetCap !== undefined) updated.budgetCap = payload.budgetCap;
         if (payload.budgetOverride !== undefined) updated.budgetOverride = payload.budgetOverride;
         if (payload.entries !== undefined) updated.entries = payload.entries;
-        if (viewersNormalized !== undefined) updated.viewers = viewersNormalized;
+        if (usersNormalized !== undefined) updated.users = usersNormalized;
         if (payload.status !== undefined) updated.status = payload.status;
 
         // Only ADMIN may change ownerId
@@ -226,7 +221,10 @@ export async function updateReport(req: Request, res: Response) {
 
         try {
             const result = modelUpdateReport(id, updated, expectedVersion);
-            return res.json(toReportView(result));
+
+            // Asynchronously calc the new report metrics without blocking the response.
+            JobQueueService.enqueue({ type: 'UPDATE_REPORT_VIEW', payload: { reportId: result.id } });
+            return res.json(toReportView(result)); // Return the latest data synchronously for now, but the view is being updated in the background.
         } catch (err: any) {
             if (err && err.code === 'VERSION_MISMATCH') return res.status(409).json({ error: 'VersionMismatch' });
             throw err;
@@ -242,7 +240,7 @@ export async function addComment(req: Request, res: Response) {
     try {
         const id = req.params.id;
         const payload = req.body as { text?: string; priority?: 'low' | 'normal' | 'high' } | undefined;
-        const user = (req as any).user as JwtPayload | undefined;
+        const user = (req as any).user as JwtPayload;
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
         if (!payload || !payload.text || typeof payload.text !== 'string') return res.status(400).json({ error: 'MissingField', message: 'text is required' });
 
@@ -253,7 +251,7 @@ export async function addComment(req: Request, res: Response) {
         const allowed = (() => {
             if (user.role === 'ADMIN') return true;
             if (existing.ownerId === user.id) return true;
-            return Array.isArray(existing.viewers) && existing.viewers.some((v) => v.userId === user.id && (v.access === 'COMMENT' || v.access === 'EDIT'));
+            return Array.isArray(existing.users) && existing.users.some((v) => v.userId === user.id && (v.access === 'COMMENT' || v.access === 'EDIT'));
         })();
         if (!allowed) return res.status(403).json({ error: 'Forbidden' });
 
@@ -302,14 +300,14 @@ export async function uploadAttachment(req: Request, res: Response) {
             const existing = getReportById(id);
             if (!existing) return res.status(404).json({ error: 'NotFound' });
 
-            const user = (req as any).user as JwtPayload | undefined;
+            const user = (req as any).user as JwtPayload;
             if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
             // Permission Check
             const allowed = (() => {
                 if (user.role === 'ADMIN') return true;
                 if (existing.ownerId === user.id) return true;
-                return Array.isArray(existing.viewers) && existing.viewers.some((v) => v.userId === user.id && v.access === 'EDIT');
+                return Array.isArray(existing.users) && existing.users.some((v) => v.userId === user.id && v.access === 'EDIT');
             })();
             if (!allowed) return res.status(403).json({ error: 'Forbidden' });
 
@@ -349,13 +347,13 @@ export async function getAttachmentUrl(req: Request, res: Response) {
         if (!attachment) return res.status(404).json({ error: 'Attachment not found' });
 
         // 2. Check Permissions (Same logic as Upload)
-        const user = (req as any).user as JwtPayload | undefined;
+        const user = (req as any).user as JwtPayload;
         if (!user) return res.status(401).json({ error: 'Unauthorized' });
 
         const allowed = (() => {
             if (user.role === 'ADMIN') return true;
             if (report.ownerId === user.id) return true;
-            return Array.isArray(report.viewers) && report.viewers.some((v) => v.userId === user.id);
+            return Array.isArray(report.users) && report.users.some((v) => v.userId === user.id);
         })();
 
         if (!allowed) return res.status(403).json({ error: 'Forbidden' });
